@@ -179,16 +179,11 @@ public class PasswordlessCreateCodeAPITest2_9 {
         JsonObject resendCodeRequestBody = new JsonObject();
         resendCodeRequestBody.addProperty("deviceId", createResp.get("deviceId").getAsString());
 
-        try {
-            JsonObject resendResp = HttpRequestForTesting.sendJsonPOSTRequest(process.getProcess(), "",
-                    "http://localhost:3567/recipe/signinup/code", resendCodeRequestBody, 1000, 1000, null,
-                    Utils.getCdiVersion2_9ForTests(), "passwordless");
+        JsonObject resendResp = HttpRequestForTesting.sendJsonPOSTRequest(process.getProcess(), "",
+                "http://localhost:3567/recipe/signinup/code", resendCodeRequestBody, 1000, 1000, null,
+                Utils.getCdiVersion2_9ForTests(), "passwordless");
 
-            checkResponse(resendResp);
-        } catch (HttpResponseException e) {
-            System.out.println("ASDFASDF");
-            System.out.println(e.getMessage());
-        }
+        checkResponse(resendResp);
 
         process.kill();
         assertNotNull(process.checkOrWaitForEvent(ProcessState.PROCESS_STATE.STOPPED));

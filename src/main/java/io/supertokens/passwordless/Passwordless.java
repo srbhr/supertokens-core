@@ -73,7 +73,7 @@ public class Passwordless {
         return StorageLayer.getPasswordlessStorage(main).getUserById(userId);
     }
 
-    public static CreateCodeResponse createCode(Main main, String email, String phoneNumber, String deviceId,
+    public static CreateCodeResponse createCode(Main main, String email, String phoneNumber, @Nullable String deviceId,
             @Nullable String userInputCode) throws RestartFlowException, DuplicateLinkCodeHashException,
             StorageQueryException, NoSuchAlgorithmException, InvalidKeyException {
         PasswordlessSQLStorage passwordlessStorage = StorageLayer.getPasswordlessStorage(main);
@@ -115,44 +115,25 @@ public class Passwordless {
 
             final String currDeviceIdHash = deviceIdHash;
             try {
-                passwordlessStorage.startTransaction(con -> {
-                    if (!gotDeviceId) {
-                        try {
-                            passwordlessStorage.createDevice_Transaction(con, currDeviceIdHash, email, phoneNumber);
-                        } catch (DuplicateDeviceIdHashException ex) {
-                            throw new StorageTransactionLogicException(ex);
-                        }
-                    } else {
-                        PasswordlessDevice device = passwordlessStorage.getDevice_Transaction(con, currDeviceIdHash);
-                        if (device == null) {
-                            throw new StorageTransactionLogicException(new UnknownDeviceIdHash());
-                        }
-                    }
+                if (!gotDeviceId) {
+                    passwordlessStorage.createDeviceWithCode(currDeviceIdHash, email, phoneNumber, codeId, linkCodeHash,
+                            createdAt);
 
-                    try {
-                        passwordlessStorage.createCode_Transaction(con, codeId, currDeviceIdHash, linkCodeHash,
-                                createdAt);
-                    } catch (UnknownDeviceIdHash | DuplicateCodeIdException | DuplicateLinkCodeHashException ex) {
-                        throw new StorageTransactionLogicException(ex);
-                    }
-                    passwordlessStorage.commitTransaction(con);
-                    return null;
-                });
-            } catch (StorageTransactionLogicException e) {
-                if (e.actualException instanceof DuplicateLinkCodeHashException) {
+                } else {
+                    passwordlessStorage.createCode(codeId, currDeviceIdHash, linkCodeHash, createdAt);
+                }
+                return new CreateCodeResponse(deviceIdHash, codeId, deviceId, userInputCode, linkCode, createdAt);
+            } catch (DuplicateLinkCodeHashException e) {
+                if (gotDeviceId && gotUserInputCode) {
                     // We only need to rethrow if the user supplied both the deviceId and the userInputCode,
                     // because in that case the linkCodeHash will always be the same.
-                    if (gotDeviceId && gotUserInputCode) {
-                        throw (DuplicateLinkCodeHashException) e.actualException;
-                    }
-                } else if (e.actualException instanceof UnknownDeviceIdHash) {
-                    throw new RestartFlowException();
+                    throw e;
                 }
-                // We could also get: DuplicateCodeIdException, DuplicateDeviceIdHashException
+            } catch (UnknownDeviceIdHash e) {
+                throw new RestartFlowException();
+            } catch (DuplicateCodeIdException | DuplicateDeviceIdHashException e) {
                 // These are retryable, so ignored here.
             }
-
-            return new CreateCodeResponse(deviceIdHash, codeId, deviceId, userInputCode, linkCode, createdAt);
         }
     }
 
