@@ -144,13 +144,13 @@ public class AuthRecipeTest {
 
         {
             long count = AuthRecipe.getUsersCount(process.getProcess(), new RECIPE_ID[] {});
-            assert (count == 3);
+            assert (count == 5);
         }
 
         {
             long count = AuthRecipe.getUsersCount(process.getProcess(),
-                    new RECIPE_ID[] { RECIPE_ID.EMAIL_PASSWORD, RECIPE_ID.THIRD_PARTY });
-            assert (count == 5);
+                    new RECIPE_ID[] { RECIPE_ID.EMAIL_PASSWORD, RECIPE_ID.PASSWORDLESS });
+            assert (count == 4);
         }
 
         {
@@ -597,6 +597,15 @@ public class AuthRecipeTest {
                 String email = "test" + count.getAndIncrement() + "@example.com";
 
                 return ThirdParty.signInUp(process.getProcess(), thirdPartyId, thirdPartyUserId, email).user;
+            } catch (Exception ignored) {
+            }
+            return null;
+        });
+        signUpMap.put("io.supertokens.pluginInterface.passwordless.UserInfo", o -> {
+            try {
+                String email = "test" + count.getAndIncrement() + "@example.com";
+                CreateCodeResponse createCode = Passwordless.createCode(process.getProcess(), email, null, null, null);
+                return Passwordless.consumeCode(process.getProcess(), null, null, createCode.linkCode).user;
             } catch (Exception ignored) {
             }
             return null;
