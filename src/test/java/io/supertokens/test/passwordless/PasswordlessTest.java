@@ -16,17 +16,12 @@
 
 package io.supertokens.test.passwordless;
 
-import io.supertokens.Main;
 import io.supertokens.ProcessState;
 import io.supertokens.passwordless.Passwordless;
-import io.supertokens.passwordless.Passwordless.ConsumeCodeResponse;
-import io.supertokens.passwordless.exceptions.IncorrectUserInputCodeException;
 import io.supertokens.passwordless.exceptions.RestartFlowException;
 import io.supertokens.pluginInterface.STORAGE_TYPE;
-import io.supertokens.pluginInterface.exceptions.StorageQueryException;
 import io.supertokens.pluginInterface.passwordless.PasswordlessCode;
 import io.supertokens.pluginInterface.passwordless.PasswordlessDevice;
-import io.supertokens.pluginInterface.passwordless.UserInfo;
 import io.supertokens.storageLayer.StorageLayer;
 import io.supertokens.test.TestingProcessManager;
 import io.supertokens.test.Utils;

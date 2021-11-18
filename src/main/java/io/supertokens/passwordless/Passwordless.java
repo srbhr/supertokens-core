@@ -188,7 +188,6 @@ public class Passwordless {
         return passwordlessStorage.getCodesOfDevice(deviceId);
     }
 
-
     public static class CreateCodeResponse {
         public String deviceIdHash;
         public String codeId;
