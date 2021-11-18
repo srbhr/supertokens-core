@@ -19,6 +19,7 @@ package io.supertokens.test.passwordless;
 import io.supertokens.Main;
 import io.supertokens.ProcessState;
 import io.supertokens.passwordless.Passwordless;
+import io.supertokens.passwordless.exceptions.ExpiredUserInputCodeException;
 import io.supertokens.passwordless.exceptions.IncorrectUserInputCodeException;
 import io.supertokens.passwordless.exceptions.RestartFlowException;
 import io.supertokens.passwordless.Passwordless.ConsumeCodeResponse;
@@ -346,7 +347,7 @@ public class PasswordlessTest {
             error = ex;
         }
         assertNotNull(error);
-        assert (error instanceof RestartFlowException);
+        assert (error instanceof ExpiredUserInputCodeException);
 
         process.kill();
         assertNotNull(process.checkOrWaitForEvent(ProcessState.PROCESS_STATE.STOPPED));
@@ -380,7 +381,7 @@ public class PasswordlessTest {
             error = ex;
         }
         assertNotNull(error);
-        assert (error instanceof IncorrectUserInputCodeException);
+        assert (error instanceof ExpiredUserInputCodeException);
 
         process.kill();
         assertNotNull(process.checkOrWaitForEvent(ProcessState.PROCESS_STATE.STOPPED));

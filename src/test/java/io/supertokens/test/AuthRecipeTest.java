@@ -20,6 +20,8 @@ import io.supertokens.ProcessState;
 import io.supertokens.authRecipe.AuthRecipe;
 import io.supertokens.authRecipe.UserPaginationContainer;
 import io.supertokens.emailpassword.EmailPassword;
+import io.supertokens.passwordless.Passwordless;
+import io.supertokens.passwordless.Passwordless.CreateCodeResponse;
 import io.supertokens.pluginInterface.RECIPE_ID;
 import io.supertokens.pluginInterface.STORAGE_TYPE;
 import io.supertokens.pluginInterface.authRecipe.AuthRecipeUserInfo;
@@ -92,6 +94,11 @@ public class AuthRecipeTest {
             assert (count == 0);
         }
 
+        {
+            long count = AuthRecipe.getUsersCount(process.getProcess(), new RECIPE_ID[] { RECIPE_ID.PASSWORDLESS });
+            assert (count == 0);
+        }
+
         String thirdPartyId = "testThirdParty";
         String thirdPartyUserId_1 = "thirdPartyUserIdA";
         String email_1 = "testA@example.com";
@@ -119,6 +126,47 @@ public class AuthRecipeTest {
             assert (count == 1);
         }
 
+        {
+            long count = AuthRecipe.getUsersCount(process.getProcess(), new RECIPE_ID[] { RECIPE_ID.PASSWORDLESS });
+            assert (count == 0);
+        }
+
+        {
+            CreateCodeResponse createCode = Passwordless.createCode(process.getProcess(), "testX@example.com", null,
+                    null, null);
+            Passwordless.consumeCode(process.getProcess(), null, null, createCode.linkCode);
+        }
+        {
+            CreateCodeResponse createCode = Passwordless.createCode(process.getProcess(), null, "+442071838750", null,
+                    null);
+            Passwordless.consumeCode(process.getProcess(), null, null, createCode.linkCode);
+        }
+
+        {
+            long count = AuthRecipe.getUsersCount(process.getProcess(), new RECIPE_ID[] {});
+            assert (count == 3);
+        }
+
+        {
+            long count = AuthRecipe.getUsersCount(process.getProcess(),
+                    new RECIPE_ID[] { RECIPE_ID.EMAIL_PASSWORD, RECIPE_ID.THIRD_PARTY });
+            assert (count == 5);
+        }
+
+        {
+            long count = AuthRecipe.getUsersCount(process.getProcess(), new RECIPE_ID[] { RECIPE_ID.EMAIL_PASSWORD });
+            assert (count == 2);
+        }
+
+        {
+            long count = AuthRecipe.getUsersCount(process.getProcess(), new RECIPE_ID[] { RECIPE_ID.THIRD_PARTY });
+            assert (count == 1);
+        }
+
+        {
+            long count = AuthRecipe.getUsersCount(process.getProcess(), new RECIPE_ID[] { RECIPE_ID.PASSWORDLESS });
+            assert (count == 2);
+        }
         process.kill();
         assertNotNull(process.checkOrWaitForEvent(ProcessState.PROCESS_STATE.STOPPED));
     }
