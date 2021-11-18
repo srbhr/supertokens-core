@@ -188,6 +188,121 @@ public class Passwordless {
         return passwordlessStorage.getCodesOfDevice(deviceId);
     }
 
+    public static ConsumeCodeResponse consumeCode(Main main, String deviceId, String userInputCode, String linkCode)
+            throws Exception, NoSuchAlgorithmException, InvalidKeyException {
+        PasswordlessSQLStorage passwordlessStorage = StorageLayer.getPasswordlessStorage(main);
+        long passwordlessCodeLifetime = Config.getConfig(main).getPasswordlessCodeLifetime();
+        String deviceIdHash;
+        String linkCodeHash;
+        if (linkCode != null) {
+            byte[] linkCodeBytes = Base64.decodeBase64URLSafe(linkCode);
+            byte[] linkCodeHashBytes = Utils.hashSHA256Bytes(linkCodeBytes);
+            linkCodeHash = Base64.encodeBase64String(linkCodeHashBytes);
+            PasswordlessCode code = passwordlessStorage.getCodeByLinkCodeHash(linkCodeHash);
+            if (code == null || code.createdAt < System.currentTimeMillis() - passwordlessCodeLifetime) {
+                throw new RestartFlowException();
+            }
+            deviceIdHash = code.deviceIdHash;
+        } else {
+            byte[] deviceIdBytes = Base64.decodeBase64(deviceId);
+            deviceIdHash = Base64.encodeBase64URLSafeString(Utils.hashSHA256Bytes(deviceIdBytes));
+
+            byte[] linkCodeBytes = Utils.hmacSHA256(deviceIdBytes, userInputCode);
+            byte[] linkCodeHashBytes = Utils.hashSHA256Bytes(linkCodeBytes);
+            linkCodeHash = Base64.encodeBase64String(linkCodeHashBytes);
+        }
+
+        while (true) {
+            try {
+                return passwordlessStorage.startTransaction(con -> {
+                    PasswordlessDevice device = passwordlessStorage.getDevice_Transaction(con, deviceIdHash);
+                    if (device == null) {
+                        throw new StorageTransactionLogicException(new RestartFlowException());
+                    }
+                    if (device.failedAttempts >= Config.getConfig(main).getAccessTokenValidity()) {
+                        passwordlessStorage.deleteDevice_Transaction(con, deviceIdHash);
+                        passwordlessStorage.commitTransaction(con);
+                        throw new StorageTransactionLogicException(new RestartFlowException());
+                    }
+                    PasswordlessCode code = passwordlessStorage.getCodeByLinkCodeHash_Transaction(con, linkCodeHash);
+                    if (code == null || code.createdAt < System.currentTimeMillis() - passwordlessCodeLifetime) {
+                        if (deviceId != null) {
+                            if (device.failedAttempts + 1 == Config.getConfig(main)
+                                    .getPasswordlessMaxCodeInputAttempts()) {
+                                passwordlessStorage.deleteDevice_Transaction(con, deviceIdHash);
+                                passwordlessStorage.commitTransaction(con);
+                                throw new StorageTransactionLogicException(new RestartFlowException());
+                            } else {
+                                PasswordlessCode[] codes = passwordlessStorage.getCodesOfDevice_Transaction(con,
+                                        deviceIdHash);
+                                if (Arrays.stream(codes)
+                                        .anyMatch(otherCode -> otherCode.createdAt > System.currentTimeMillis()
+                                                - passwordlessCodeLifetime)) {
+                                    passwordlessStorage.incrementDeviceFailedAttemptCount_Transaction(con,
+                                            deviceIdHash);
+                                    passwordlessStorage.commitTransaction(con);
+                                } else {
+                                    passwordlessStorage.deleteDevice_Transaction(con, deviceIdHash);
+                                    passwordlessStorage.commitTransaction(con);
+                                    throw new StorageTransactionLogicException(new RestartFlowException());
+                                }
+                                throw new StorageTransactionLogicException(
+                                        new IncorrectUserInputCodeException(device.failedAttempts + 1));
+                            }
+                        }
+                        throw new StorageTransactionLogicException(new RestartFlowException());
+                    }
+
+                    // Code exists and is valid
+                    UserInfo user = device.email != null ? passwordlessStorage.getUserByEmail(device.email)
+                            : passwordlessStorage.getUserByPhoneNumber(device.phoneNumber);
+
+                    if (user == null) {
+                        String userId = Utils.getUUID();
+                        long timeJoined = System.currentTimeMillis();
+                        if (device.email != null) {
+                            passwordlessStorage.deleteDevicesByEmail_Transaction(con, device.email);
+                        } else if (device.phoneNumber != null) {
+                            passwordlessStorage.deleteDevicesByPhoneNumber_Transaction(con, device.phoneNumber);
+                        }
+
+                        try {
+                            passwordlessStorage.createUser_Transaction(con, userId, device.email, device.phoneNumber,
+                                    timeJoined);
+                        } catch (DuplicateUserIdException | DuplicateEmailException
+                                | DuplicatePhoneNumberException ex) {
+                            throw new StorageTransactionLogicException(ex);
+                        }
+                        return new ConsumeCodeResponse(true,
+                                new UserInfo(userId, device.email, device.phoneNumber, timeJoined));
+                    } else {
+                        if (user.email != null) {
+                            passwordlessStorage.deleteDevicesByEmail_Transaction(con, user.email);
+                        }
+                        if (user.phoneNumber != null) {
+                            passwordlessStorage.deleteDevicesByPhoneNumber_Transaction(con, user.phoneNumber);
+                        }
+                        passwordlessStorage.commitTransaction(con);
+                        return new ConsumeCodeResponse(false, user);
+                    }
+                });
+            } catch (StorageTransactionLogicException e) {
+                if (e.actualException instanceof DuplicateUserIdException) {
+                    continue;
+                } else if (e.actualException instanceof DuplicateEmailException
+                        || e.actualException instanceof DuplicatePhoneNumberException) {
+                    // This should never actually get here:
+                    // We could only get here if someone used two different codes at the same time for their first
+                    // login,
+                    // but this should end up as a deadlock because they both locked their own devices
+                    // and tried to delete all other devices with the same email/phoneNumber
+                    throw e.actualException;
+                }
+                throw e.actualException;
+            }
+        }
+    }
+
     public static class CreateCodeResponse {
         public String deviceIdHash;
         public String codeId;
@@ -207,4 +322,13 @@ public class Passwordless {
         }
     }
 
+    public static class ConsumeCodeResponse {
+        public boolean createdNewUser;
+        public UserInfo user;
+
+        public ConsumeCodeResponse(boolean createdNewUser, UserInfo user) {
+            this.createdNewUser = createdNewUser;
+            this.user = user;
+        }
+    }
 }
