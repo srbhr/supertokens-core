@@ -18,7 +18,6 @@ package io.supertokens.test.passwordless.api;
 
 import com.google.gson.JsonObject;
 import io.supertokens.ProcessState;
-import io.supertokens.emailverification.EmailVerification;
 import io.supertokens.pluginInterface.STORAGE_TYPE;
 import io.supertokens.storageLayer.StorageLayer;
 import io.supertokens.test.TestingProcessManager;
@@ -34,17 +33,7 @@ import org.junit.Test;
 import org.junit.rules.TestRule;
 
 import static org.junit.Assert.*;
-/*
- * TODO:
- *  - good input
- *  - Sign up with unnormalised email, and sign in with normailised email to get the same user.
- *  - bad input
- *     - simple bad input
- *     - email sub object's fiels are missing
- *  - all error states
- * */
 
-import java.net.http.HttpResponse;
 import java.util.UUID;
 
 public class PasswordlessCreateCodeAPITest2_9 {

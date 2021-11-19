@@ -36,18 +36,12 @@ import io.supertokens.pluginInterface.passwordless.exception.UnknownDeviceIdHash
 import io.supertokens.pluginInterface.passwordless.sqlStorage.PasswordlessSQLStorage;
 import io.supertokens.storageLayer.StorageLayer;
 import io.supertokens.utils.Utils;
-import io.supertokens.webserver.WebserverAPI;
 
 import java.security.InvalidKeyException;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Arrays;
-import java.util.UUID;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.servlet.ServletException;
 
 import org.apache.tomcat.util.codec.binary.Base64;
 
@@ -60,18 +54,6 @@ public class Passwordless {
 
     private static Character getRandomNumChar(SecureRandom gen) {
         return Character.toChars(gen.nextInt(9) + 48)[0];
-    }
-
-    public static UserInfo getUserByPhoneNumber(Main main, String phoneNumber) throws StorageQueryException {
-        return StorageLayer.getPasswordlessStorage(main).getUserByPhoneNumber(phoneNumber);
-    }
-
-    public static UserInfo getUserByEmail(Main main, String email) throws StorageQueryException {
-        return StorageLayer.getPasswordlessStorage(main).getUserByEmail(email);
-    }
-
-    public static UserInfo getUserById(Main main, String userId) throws StorageQueryException {
-        return StorageLayer.getPasswordlessStorage(main).getUserById(userId);
     }
 
     public static CreateCodeResponse createCode(Main main, String email, String phoneNumber, @Nullable String deviceId,
@@ -115,13 +97,12 @@ public class Passwordless {
             long createdAt = System.currentTimeMillis();
 
             final String currDeviceIdHash = deviceIdHash;
+            PasswordlessCode code = new PasswordlessCode(codeId, currDeviceIdHash, linkCodeHash, createdAt);
             try {
                 if (!gotDeviceId) {
-                    passwordlessStorage.createDeviceWithCode(currDeviceIdHash, email, phoneNumber, codeId, linkCodeHash,
-                            createdAt);
-
+                    passwordlessStorage.createDeviceWithCode(email, phoneNumber, code);
                 } else {
-                    passwordlessStorage.createCode(codeId, currDeviceIdHash, linkCodeHash, createdAt);
+                    passwordlessStorage.createCode(code);
                 }
                 return new CreateCodeResponse(deviceIdHash, codeId, deviceId, userInputCode, linkCode, createdAt);
             } catch (DuplicateLinkCodeHashException e) {
@@ -130,6 +111,7 @@ public class Passwordless {
                     // because in that case the linkCodeHash will always be the same.
                     throw e;
                 }
+                // It's retrieable otherwise
             } catch (UnknownDeviceIdHash e) {
                 throw new RestartFlowException();
             } catch (DuplicateCodeIdException | DuplicateDeviceIdHashException e) {
@@ -152,22 +134,6 @@ public class Passwordless {
             }
         }
         return sb.toString();
-    }
-
-    public static PasswordlessDevice[] listDevicesByEmail(Main main, String email) throws StorageQueryException {
-        PasswordlessSQLStorage passwordlessStorage = StorageLayer.getPasswordlessStorage(main);
-        return passwordlessStorage.getDevicesByEmail(email);
-    }
-
-    public static PasswordlessDevice[] listDevicesByPhoneNumber(Main main, String phoneNumber)
-            throws StorageQueryException {
-        PasswordlessSQLStorage passwordlessStorage = StorageLayer.getPasswordlessStorage(main);
-        return passwordlessStorage.getDevicesByPhoneNumber(phoneNumber);
-    }
-
-    public static PasswordlessCode[] listCodesOfDevice(Main main, String deviceId) throws StorageQueryException {
-        PasswordlessSQLStorage passwordlessStorage = StorageLayer.getPasswordlessStorage(main);
-        return passwordlessStorage.getCodesOfDevice(deviceId);
     }
 
     public static ConsumeCodeResponse consumeCode(Main main, String deviceId, String userInputCode, String linkCode)
