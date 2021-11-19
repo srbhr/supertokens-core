@@ -19,8 +19,10 @@ package io.supertokens.passwordless.exceptions;
 public class ExpiredUserInputCodeException extends Exception {
     private static final long serialVersionUID = 7413621608446896291L;
     public final int failedCodeInputs;
+    public final int maximumCodeInputAttempts;
 
-    public ExpiredUserInputCodeException(int failedCodeInputs) {
+    public ExpiredUserInputCodeException(int failedCodeInputs, int maximumCodeInputAttempts) {
         this.failedCodeInputs = failedCodeInputs;
+        this.maximumCodeInputAttempts = maximumCodeInputAttempts;
     }
 }

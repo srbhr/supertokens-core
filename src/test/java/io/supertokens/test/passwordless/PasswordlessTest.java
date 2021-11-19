@@ -212,7 +212,7 @@ public class PasswordlessTest {
         if (StorageLayer.getStorage(process.getProcess()).getType() != STORAGE_TYPE.SQL) {
             return;
         }
-        
+
         PasswordlessStorage storage = StorageLayer.getPasswordlessStorage(process.getProcess());
 
         String email = "test@example.com";
@@ -241,7 +241,7 @@ public class PasswordlessTest {
         if (StorageLayer.getStorage(process.getProcess()).getType() != STORAGE_TYPE.SQL) {
             return;
         }
-        
+
         PasswordlessStorage storage = StorageLayer.getPasswordlessStorage(process.getProcess());
 
         String email = "test@example.com";
@@ -270,7 +270,7 @@ public class PasswordlessTest {
         if (StorageLayer.getStorage(process.getProcess()).getType() != STORAGE_TYPE.SQL) {
             return;
         }
-        
+
         PasswordlessStorage storage = StorageLayer.getPasswordlessStorage(process.getProcess());
 
         String email = "test@example.com";
@@ -314,7 +314,7 @@ public class PasswordlessTest {
         if (StorageLayer.getStorage(process.getProcess()).getType() != STORAGE_TYPE.SQL) {
             return;
         }
-        
+
         PasswordlessStorage storage = StorageLayer.getPasswordlessStorage(process.getProcess());
 
         String email = "test@example.com";
@@ -348,7 +348,7 @@ public class PasswordlessTest {
         if (StorageLayer.getStorage(process.getProcess()).getType() != STORAGE_TYPE.SQL) {
             return;
         }
-        
+
         PasswordlessStorage storage = StorageLayer.getPasswordlessStorage(process.getProcess());
 
         String email = "test@example.com";
@@ -383,7 +383,7 @@ public class PasswordlessTest {
         if (StorageLayer.getStorage(process.getProcess()).getType() != STORAGE_TYPE.SQL) {
             return;
         }
-        
+
         PasswordlessStorage storage = StorageLayer.getPasswordlessStorage(process.getProcess());
 
         String email = "test@example.com";
@@ -418,7 +418,7 @@ public class PasswordlessTest {
         if (StorageLayer.getStorage(process.getProcess()).getType() != STORAGE_TYPE.SQL) {
             return;
         }
-        
+
         PasswordlessStorage storage = StorageLayer.getPasswordlessStorage(process.getProcess());
 
         String email = "test@example.com";
@@ -440,8 +440,8 @@ public class PasswordlessTest {
         assertNotNull(process.checkOrWaitForEvent(ProcessState.PROCESS_STATE.STOPPED));
     }
 
-    private UserInfo checkUserWithConsumeResponse(PasswordlessStorage storage, ConsumeCodeResponse resp, String email, String phoneNumber,
-            long joinedAfter) throws StorageQueryException {
+    private UserInfo checkUserWithConsumeResponse(PasswordlessStorage storage, ConsumeCodeResponse resp, String email,
+            String phoneNumber, long joinedAfter) throws StorageQueryException {
         UserInfo user = storage.getUserById(resp.user.id);
         assertNotNull(user);
 

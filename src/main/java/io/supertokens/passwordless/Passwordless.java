@@ -137,7 +137,8 @@ public class Passwordless {
     }
 
     public static ConsumeCodeResponse consumeCode(Main main, String deviceId, String userInputCode, String linkCode)
-            throws Exception, NoSuchAlgorithmException, InvalidKeyException {
+            throws RestartFlowException, ExpiredUserInputCodeException, IncorrectUserInputCodeException,
+            StorageTransactionLogicException, StorageQueryException, NoSuchAlgorithmException, InvalidKeyException {
         PasswordlessSQLStorage passwordlessStorage = StorageLayer.getPasswordlessStorage(main);
         long passwordlessCodeLifetime = Config.getConfig(main).getPasswordlessCodeLifetime();
         String deviceIdHash;
@@ -174,18 +175,19 @@ public class Passwordless {
                 PasswordlessCode code = passwordlessStorage.getCodeByLinkCodeHash_Transaction(con, linkCodeHash);
                 if (code == null || code.createdAt < System.currentTimeMillis() - passwordlessCodeLifetime) {
                     if (deviceId != null) {
-                        if (device.failedAttempts + 1 == Config.getConfig(main).getPasswordlessMaxCodeInputAttempts()) {
+                        int maxCodeInputAttempts = Config.getConfig(main).getPasswordlessMaxCodeInputAttempts();
+                        if (device.failedAttempts + 1 == maxCodeInputAttempts) {
                             passwordlessStorage.deleteDevice_Transaction(con, deviceIdHash);
                             passwordlessStorage.commitTransaction(con);
                             throw new StorageTransactionLogicException(new RestartFlowException());
                         } else {
                             passwordlessStorage.incrementDeviceFailedAttemptCount_Transaction(con, deviceIdHash);
                             if (code != null) {
-                                throw new StorageTransactionLogicException(
-                                        new ExpiredUserInputCodeException(device.failedAttempts + 1));
+                                throw new StorageTransactionLogicException(new ExpiredUserInputCodeException(
+                                        device.failedAttempts + 1, maxCodeInputAttempts));
                             } else {
-                                throw new StorageTransactionLogicException(
-                                        new IncorrectUserInputCodeException(device.failedAttempts + 1));
+                                throw new StorageTransactionLogicException(new IncorrectUserInputCodeException(
+                                        device.failedAttempts + 1, maxCodeInputAttempts));
                             }
                         }
                     }
@@ -214,36 +216,35 @@ public class Passwordless {
                 return device;
             });
         } catch (StorageTransactionLogicException e) {
-            if (e.actualException instanceof DuplicateEmailException
-                    || e.actualException instanceof DuplicatePhoneNumberException) {
-                throw e.actualException;
+            if (e.actualException instanceof ExpiredUserInputCodeException) {
+                throw (ExpiredUserInputCodeException) e.actualException;
             }
-            throw e.actualException;
+            if (e.actualException instanceof IncorrectUserInputCodeException) {
+                throw (IncorrectUserInputCodeException) e.actualException;
+            }
+            throw e;
         }
-        while (true) {
-            try {
-                UserInfo user = consumedDevice.email != null ? passwordlessStorage.getUserByEmail(consumedDevice.email)
-                        : passwordlessStorage.getUserByPhoneNumber(consumedDevice.phoneNumber);
-                if (user == null) {
-                    String userId = Utils.getUUID();
-                    long timeJoined = System.currentTimeMillis();
-                    try {
-                        passwordlessStorage.createUser(userId, consumedDevice.email, consumedDevice.phoneNumber,
-                                timeJoined);
-                    } catch (DuplicateUserIdException | DuplicateEmailException | DuplicatePhoneNumberException ex) {
-                        throw new StorageTransactionLogicException(ex);
+
+        UserInfo user = consumedDevice.email != null ? passwordlessStorage.getUserByEmail(consumedDevice.email)
+                : passwordlessStorage.getUserByPhoneNumber(consumedDevice.phoneNumber);
+        if (user == null) {
+            while (true) {
+                try {
+                    if (user == null) {
+                        String userId = Utils.getUUID();
+                        long timeJoined = System.currentTimeMillis();
+                        user = new UserInfo(userId, consumedDevice.email, consumedDevice.phoneNumber, timeJoined);
+                        passwordlessStorage.createUser(user);
+                        return new ConsumeCodeResponse(true, user);
                     }
-                    return new ConsumeCodeResponse(true,
-                            new UserInfo(userId, consumedDevice.email, consumedDevice.phoneNumber, timeJoined));
+                } catch (DuplicateEmailException | DuplicatePhoneNumberException e) {
+                    throw new RestartFlowException();
+                } catch (DuplicateUserIdException e) {
+                    // We can retry..
                 }
-                return new ConsumeCodeResponse(false, user);
-            } catch (StorageTransactionLogicException e) {
-                if (e.actualException instanceof DuplicateUserIdException) {
-                    continue;
-                }
-                throw e.actualException;
             }
         }
+        return new ConsumeCodeResponse(false, user);
     }
 
     public static class CreateCodeResponse {
